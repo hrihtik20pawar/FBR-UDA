@@ -62,7 +62,8 @@ def setup_environment():
     print("[4/4] Installing remaining dependencies...")
     deps = [
         "opencv-python", "numpy", "tqdm", "pillow",
-        "torchmetrics", "segment-anything", "pytz", "requests"
+        "torchmetrics", "segment-anything", "pytz", "requests",
+        "matplotlib", "seaborn", "scikit-learn"
     ]
     subprocess.run([python, "-m", "pip", "install"] + deps, check=False)
 
@@ -109,11 +110,21 @@ def train_models(python):
 
 
 # ─────────────────────────────────────────────────────
+# Step 5: Visualize Results
+# ─────────────────────────────────────────────────────
+def visualize_results(python):
+    print("\n" + "=" * 60)
+    print("STEP 5: Generating Result Visualizations")
+    print("=" * 60)
+    subprocess.run([python, str(PROJECT_ROOT / "visualize_results.py")], check=False)
+
+
+# ─────────────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="FBR-UDA: Full Setup & Run")
-    parser.add_argument("--step", choices=["setup", "download", "fbr", "train", "all"],
+    parser.add_argument("--step", choices=["setup", "download", "fbr", "train", "visualize", "all"],
                         default="all", help="Which step to run (default: all)")
     args = parser.parse_args()
 
@@ -131,11 +142,15 @@ def main():
     if args.step in ("train", "all"):
         train_models(python)
 
+    if args.step in ("visualize", "all"):
+        visualize_results(python)
+
     if args.step == "all":
         print("\n" + "=" * 60)
         print("ALL DONE!")
         print("=" * 60)
         print("Results saved in: exp/apple_*/")
+        print("Visualizations saved in: results/")
 
 
 if __name__ == "__main__":
