@@ -52,11 +52,11 @@ def setup_environment():
     print("[2/4] Upgrading pip...")
     subprocess.run([python, "-m", "pip", "install", "--upgrade", "pip"], check=False)
 
-    print("[3/4] Installing PyTorch (CPU)...")
+    print("[3/4] Installing PyTorch with CUDA support...")
     subprocess.run([
         python, "-m", "pip", "install",
         "torch", "torchvision",
-        "--index-url", "https://download.pytorch.org/whl/cpu"
+        "--index-url", "https://download.pytorch.org/whl/cu118"
     ], check=False)
 
     print("[4/4] Installing remaining dependencies...")
