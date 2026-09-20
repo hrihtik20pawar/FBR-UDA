@@ -173,6 +173,12 @@ def main():
     # 0) dirs
     ensure_dirs(LAB_DIR, LAB_IMG_DIR, COMPOSED_DIR, REAL_DIR)
 
+    # Check if already done
+    masks_pickle = LAB_DIR / "pv_masks.pickle"
+    if masks_pickle.exists() and len(list(COMPOSED_DIR.iterdir())) > 100:
+        print(f"[skip] FBR already done: {len(list(COMPOSED_DIR.iterdir()))} composed images exist.")
+        return
+
     # 1) load SAM
     import torch
     sys.path.append("..")
