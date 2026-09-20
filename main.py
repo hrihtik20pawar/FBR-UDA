@@ -221,7 +221,7 @@ def run_all():
     base_args = train_config.get_args()
 
     # Common settings (adjust as needed)
-    base_args['n_epochs']   = 5
+    base_args['n_epochs']   = 300
     base_args['early_stop'] = 25          # patience
     base_args['monitor']    = 'val_loss'  # 'val_loss' or 'val_f1'
     base_args['save']       = True
