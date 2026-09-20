@@ -15,8 +15,11 @@ from models.uda_losses.nwd import NuclearWassersteinDiscrepancy
 
 
 def get_trainer(name, model, device, class_weights = None, lambda_nwd=None):
-    if (name == "dann") or (name == "dadann_w_reshape"):
-        trainer = DANNTrainer(model, device, class_weights = class_weights)
+    if name == "dann":
+        trainer = DANNTrainer(model, device, class_weights = class_weights, reshape = False)
+        return trainer
+    elif name == "dadann_w_reshape":
+        trainer = DANNTrainer(model, device, class_weights = class_weights, reshape = True)
         return trainer
     elif (name == "dann_wo_reshape") or (name == "dadann") or (name == 'cdan'):
         trainer = DANNTrainer(model, device, class_weights = class_weights, reshape = False)
