@@ -78,6 +78,14 @@ def experiment(args, logging=True):
     gc.collect()
 
     # ==== Dataset / Loader ====
+    src_type = args['src_dataset']['kwargs']['type']
+    if src_type == 'src_bg_augmented':
+        bg_dir = Path(f"data/{args['crop']}/PV/bg_composed")
+        if not bg_dir.exists() or len(list(bg_dir.iterdir())) == 0:
+            print(f"[warn] bg_composed is empty, falling back to src_lab mode")
+            args['src_dataset']['kwargs']['type'] = 'src_lab'
+            src_type = 'src_lab'
+
     src_dataset = get_dataset(args['crop'], args['src_dataset']['kwargs'])
     data_size   = len(src_dataset)
     train_size  = int(data_size * 0.75)

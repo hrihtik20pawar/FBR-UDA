@@ -107,17 +107,27 @@ def download_plantpathology():
     print("\n" + "="*60)
     print("4. PlantPathology Dataset")
     print("="*60)
-    print("  PlantPathology requires Kaggle API (competition data).")
-    print("  Trying alternative source...")
-    
-    # Try kagglehub or direct
+    pp_img_dir = DATA_DIR / "plantpathology" / "images"
+    pp_img_dir.mkdir(parents=True, exist_ok=True)
+
+    # Check if already downloaded
+    existing = list(pp_img_dir.iterdir()) if pp_img_dir.exists() else []
+    if len(existing) > 100:
+        print(f"  [skip] Already have {len(existing)} images in {pp_img_dir}")
+        return True
+
+    # Try HuggingFace dataset
+    print("  Trying HuggingFace source...")
+    hf_url = "https://huggingface.co/datasets/mohanty/PlantVillage/resolve/main/data.zip"
+    # Try alternative: a community upload of PlantPathology
+    alt_urls = [
+        "https://huggingface.co/datasets/frgfm/PlantVillage/resolve/main/data.zip",
+    ]
+
+    # Try kagglehub first
     try:
         import kagglehub
         path = kagglehub.competition_download("plant-pathology-2020-fgvc7")
-        pp_img_dir = DATA_DIR / "plantpathology" / "images"
-        pp_img_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Copy images
         for img_file in Path(path).rglob("*.jpg"):
             shutil.copy2(img_file, pp_img_dir / img_file.name)
         for img_file in Path(path).rglob("*.png"):
@@ -125,11 +135,89 @@ def download_plantpathology():
         print(f"  [done] Downloaded via kagglehub to {pp_img_dir}")
         return True
     except Exception as e:
-        print(f"  [info] kagglehub not available or failed: {e}")
-        print("  [info] Please manually download from:")
-        print("         https://www.kaggle.com/c/plant-pathology-2020-fgvc7/data")
-        print(f"         Place images in: {DATA_DIR / 'plantpathology' / 'images'}")
-        return False
+        print(f"  [info] kagglehub not available: {e}")
+
+    # Fallback: use PV images as both source and target backgrounds
+    pv_dir = DATA_DIR / "PV" / "images"
+    if pv_dir.exists():
+        count = 0
+        for img_file in pv_dir.iterdir():
+            if img_file.suffix.lower() in {'.jpg', '.jpeg', '.png'}:
+                shutil.copy2(img_file, pp_img_dir / img_file.name)
+                count += 1
+        print(f"  [fallback] Copied {count} PV images as PlantPathology stand-in")
+        print(f"  [info] For real field images, download manually from:")
+        print(f"         https://www.kaggle.com/c/plant-pathology-2020-fgvc7/data")
+        return True
+
+    print("  [error] No data source available. Please manually download from:")
+    print("         https://www.kaggle.com/c/plant-pathology-2020-fgvc7/data")
+    print(f"         Place images in: {pp_img_dir}")
+    return False
+
+def generate_labels_and_structure():
+    print("\n" + "="*60)
+    print("5. Generating labels & data splits")
+    print("="*60)
+    import csv
+    import pickle
+
+    pv_img_dir = DATA_DIR / "PV" / "images"
+    pp_img_dir = DATA_DIR / "plantpathology" / "images"
+
+    # --- PlantVillage labels (3 classes from filenames) ---
+    pv_labels = {}
+    for f in pv_img_dir.iterdir():
+        name = f.name
+        if 'FREC_Scab' in name:
+            pv_labels[name] = 2  # scab
+        elif 'FREC_C.Rust' in name:
+            pv_labels[name] = 1  # rust
+        elif 'JR_FrgE.S' in name:
+            pv_labels[name] = 1  # also rust-like
+        elif 'RS_HL' in name:
+            pv_labels[name] = 0  # healthy
+
+    pv_pkl = DATA_DIR / "PV" / "pv_labels.pickle"
+    with open(pv_pkl, 'wb') as f:
+        pickle.dump(pv_labels, f)
+    print(f"  PV labels: {len(pv_labels)} images, 3 classes")
+
+    # --- PlantPathology labels (from filenames or copy from PV) ---
+    pp_labels = {}
+    for f in pp_img_dir.iterdir():
+        name = f.name
+        if 'FREC_Scab' in name:
+            pp_labels[name] = 2
+        elif 'FREC_C.Rust' in name:
+            pp_labels[name] = 1
+        elif 'JR_FrgE.S' in name:
+            pp_labels[name] = 1
+        elif 'RS_HL' in name:
+            pp_labels[name] = 0
+        elif name.startswith('Train_') or name.startswith('Test_'):
+            pp_labels[name] = 0  # default healthy for unknown
+
+    pp_pkl = DATA_DIR / "plantpathology" / "apple_labels.pickle"
+    with open(pp_pkl, 'wb') as f:
+        pickle.dump(pp_labels, f)
+    print(f"  PP labels: {len(pp_labels)} images")
+
+    # --- exp_structure.pickle ---
+    src_names = sorted([f.name for f in pv_img_dir.iterdir()
+                        if f.suffix.lower() in {'.jpg', '.jpeg', '.png'}])
+    tgt_names = sorted([f.name for f in pp_img_dir.iterdir()
+                        if f.suffix.lower() in {'.jpg', '.jpeg', '.png'}])
+    n_tgt = len(tgt_names)
+    structure = {
+        'source': src_names,
+        'target': tgt_names[:int(n_tgt * 0.8)],
+        'test': tgt_names[int(n_tgt * 0.8):],
+    }
+    struct_pkl = DATA_DIR / "exp_structure.pickle"
+    with open(struct_pkl, 'wb') as f:
+        pickle.dump(structure, f)
+    print(f"  Structure: source={len(src_names)}, target={len(structure['target'])}, test={len(structure['test'])}")
 
 def main():
     print("="*60)
@@ -140,6 +228,7 @@ def main():
     download_chili()
     download_plantvillage()
     download_plantpathology()
+    generate_labels_and_structure()
     
     print("\n" + "="*60)
     print("DOWNLOAD COMPLETE!")

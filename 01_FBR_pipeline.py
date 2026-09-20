@@ -32,8 +32,18 @@ LAB_DIR = Path("data/apple/PV")
 LAB_IMG_DIR = LAB_DIR / "images"
 COMPOSED_DIR = LAB_DIR / "bg_composed"
 REAL_DIR = Path("data/apple/plantpathology")
-REAL_IMG_DIR = REAL_DIR / "images"
 BG_DIR = REAL_DIR / "cropped_bg"
+
+# Fallback: use PV images for backgrounds if plantpathology is empty
+def get_bg_dir():
+    if BG_DIR.exists() and len(list(BG_DIR.iterdir())) > 0:
+        return BG_DIR
+    # Fallback: crop from PV images themselves
+    fallback = LAB_DIR / "cropped_bg_fallback"
+    if not fallback.exists() or len(list(fallback.iterdir())) == 0:
+        print(f"[info] No backgrounds in {BG_DIR}, using PV images as fallback")
+        random_square_crops(LAB_IMG_DIR, fallback, seed=SEED)
+    return fallback
 
 # -----------------------------
 # Utils
@@ -161,7 +171,7 @@ def image_composition(file_name, mask, lab_dir, bg_dir, out_size=256, blur_sigma
 # -----------------------------
 def main():
     # 0) dirs
-    ensure_dirs(LAB_DIR, LAB_IMG_DIR, COMPOSED_DIR, REAL_DIR, REAL_IMG_DIR, BG_DIR)
+    ensure_dirs(LAB_DIR, LAB_IMG_DIR, COMPOSED_DIR, REAL_DIR)
 
     # 1) load SAM
     import torch
@@ -175,14 +185,9 @@ def main():
     sam.to(device=device)
     predictor = SamPredictor(sam)
 
-    # 2) crop backgrounds from real-field set
-    random_square_crops(
-        in_dir=REAL_IMG_DIR,
-        out_dir=BG_DIR,
-        crop_size=CROP_SIZE,
-        n_crops_per_image=N_CROPS_PER_IMAGE,
-        seed=SEED
-    )
+    # 2) crop backgrounds (uses plantpathology if available, else PV fallback)
+    bg_dir = get_bg_dir()
+    print(f"[info] using backgrounds from: {bg_dir}")
 
     # 3) generate masks with SAM (lab images)
     best_masks = {}
@@ -225,16 +230,16 @@ def main():
     # 4) compose
     best_masks = load_pickle(LAB_DIR / "pv_masks.pickle")
 
-    bg_list = [f for f in os.listdir(BG_DIR) if not f.startswith(".")]
+    bg_list = [f for f in os.listdir(bg_dir) if not f.startswith(".")]
     if not bg_list:
-        raise RuntimeError(f"[error] No backgrounds in {BG_DIR}")
+        raise RuntimeError(f"[error] No backgrounds in {bg_dir}")
 
     for fname in tqdm(file_names, desc="Compose"):
         if fname not in best_masks:
             print(f"[warn] mask missing: {fname} -> skip")
             continue
 
-        comp = image_composition(fname, best_masks[fname], LAB_IMG_DIR, BG_DIR, out_size=CROP_SIZE, blur_sigma=3)
+        comp = image_composition(fname, best_masks[fname], LAB_IMG_DIR, bg_dir, out_size=CROP_SIZE, blur_sigma=3)
         out_path = str(COMPOSED_DIR / fname)
         ok = cv2.imwrite(out_path, cv2.cvtColor(comp, cv2.COLOR_RGB2BGR))
         if not ok:
