@@ -78,6 +78,12 @@ def download_data(python):
     print("\n" + "=" * 60)
     print("STEP 2: Downloading datasets & weights")
     print("=" * 60)
+    # Check if data already exists
+    data_dir = PROJECT_ROOT / "data" / "apple" / "PV" / "images"
+    sam_file = PROJECT_ROOT / "sam_weights" / "sam_vit_h_4b8939.pth"
+    if data_dir.exists() and len(list(data_dir.iterdir())) > 100 and sam_file.exists():
+        print("[skip] Data and weights already downloaded.")
+        return
     subprocess.run([python, str(PROJECT_ROOT / "download_all.py")], check=False)
 
 
